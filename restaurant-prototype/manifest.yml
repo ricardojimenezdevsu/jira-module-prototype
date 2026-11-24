@@ -1,0 +1,92 @@
+# Restaurant prototype: four Jira issue-view modules talking to a Forge Remote backend.
+#
+# Each Jira issue is treated as a restaurant order:
+#   - Issue Action   "Send to kitchen"  (UI Kit)    -> POSTs the order to the kitchen backend
+#   - Issue Context  "Table service"    (UI Kit)    -> reads the issue in the browser with requestJira
+#   - Issue Panel    "Kitchen ticket"   (Custom UI) -> shows / advances the ticket kept by the backend
+#   - Issue Activity "Kitchen log"      (UI Kit)    -> lists what the backend logged for this issue
+#
+# The "kitchen" is our stub backend (../kitchen-backend), reached through Forge Remote:
+#   UI module --resolver.endpoint--> endpoint "kitchen-endpoint" --remote--> remotes "kitchen"
+
+modules:
+  jira:issueAction:
+    - key: send-to-kitchen
+      resource: action-ui
+      render: native
+      resolver:
+        endpoint: kitchen-endpoint
+      title: Send to kitchen
+
+  jira:issueContext:
+    - key: table-service
+      resource: context-ui
+      render: native
+      title: Table service
+      label: Table service
+
+  jira:issuePanel:
+    - key: kitchen-ticket
+      resource: panel-ui
+      resolver:
+        endpoint: kitchen-endpoint
+      title: Kitchen ticket
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+
+  jira:issueActivity:
+    - key: kitchen-log
+      resource: activity-ui
+      render: native
+      resolver:
+        endpoint: kitchen-endpoint
+      title: Kitchen log
+
+  # Forge Remote endpoint shared by the three modules that talk to the kitchen.
+  # appUserToken makes Forge send an `x-forge-oauth-user` header so the backend can
+  # read the issue from Jira with the permissions of the user who clicked.
+  endpoint:
+    - key: kitchen-endpoint
+      remote: kitchen
+      auth:
+        appUserToken:
+          enabled: true
+
+resources:
+  - key: action-ui
+    path: src/frontend/send-to-kitchen.jsx
+  - key: context-ui
+    path: src/frontend/table-service.jsx
+  - key: activity-ui
+    path: src/frontend/kitchen-log.jsx
+  # Custom UI: a directory with the Vite build output (run `npm run build:panel` first).
+  - key: panel-ui
+    path: static/kitchen-ticket/build
+
+remotes:
+  - key: kitchen
+    # Set per deploy from the shell, e.g. the cloudflared quick-tunnel URL:
+    #   $env:KITCHEN_URL = "https://<random>.trycloudflare.com"; forge deploy
+    # Changing this URL creates a new major version of the app.
+    baseUrl: ${KITCHEN_URL}
+    operations:
+      - compute # required for invokeRemote
+      - storage # the kitchen keeps tickets that include the issue summary
+    storage:
+      inScopeEUD: true
+
+permissions:
+  scopes:
+    - read:jira-work # GET /rest/api/3/issue/{key} (frontend requestJira and backend with user token)
+    - read:app-user-token # lets Forge send the user token to the kitchen backend
+
+environment:
+  variables:
+    - key: KITCHEN_URL
+      default: https://kitchen.example.com
+
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/74d26b02-8e17-4696-b688-936149961083
