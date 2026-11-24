@@ -1,6 +1,7 @@
 {
   // Only src/ is included: the Forge bundler fails on deploy if tsconfig picks up other folders
-  // (static/kitchen-ticket has its own tsconfig).
+  // (static/kitchen-ticket has its own tsconfig). No "noEmit" here: the Forge bundler (ts-loader)
+  // needs output; `npm run typecheck` passes --noEmit itself.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM"],
@@ -8,7 +9,6 @@
     "moduleResolution": "bundler",
     "jsx": "react",
     "strict": true,
-    "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "isolatedModules": true
