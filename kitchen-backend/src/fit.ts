@@ -9,21 +9,25 @@
  *   - app.id inside the token matches the same configured app ID
  * jose also checks exp / nbf, so expired tokens are rejected.
  */
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createLocalJWKSet, createRemoteJWKSet, jwtVerify } from 'jose';
+import type { FitClaims } from './types.ts';
 
 const JWKS_URL = 'https://forge.cdn.prod.atlassian-dev.net/.well-known/jwks.json';
+
+/** A key set jose can verify against: Atlassian's remote JWKS, or a local one in tests. */
+export type KeySet = ReturnType<typeof createRemoteJWKSet> | ReturnType<typeof createLocalJWKSet>;
 
 // createRemoteJWKSet caches the keys and refreshes them when an unknown key id shows up.
 const jwks = createRemoteJWKSet(new URL(JWKS_URL));
 
 /**
  * Verifies a FIT and returns its claims. Throws if anything is wrong.
- * @param {string} token The raw JWT from the Authorization header.
- * @param {string} appId Our app ID, e.g. "ari:cloud:ecosystem::app/<uuid>".
- * @param {Function} [keySet] Key set to verify against. Only tests pass this.
+ * @param token The raw JWT from the Authorization header.
+ * @param appId Our app ID, e.g. "ari:cloud:ecosystem::app/<uuid>".
+ * @param keySet Key set to verify against. Only tests pass this.
  */
-export async function verifyFit(token, appId, keySet = jwks) {
-  const { payload } = await jwtVerify(token, keySet, {
+export async function verifyFit(token: string, appId: string, keySet: KeySet = jwks): Promise<FitClaims> {
+  const { payload } = await jwtVerify<FitClaims>(token, keySet, {
     audience: appId,
     issuer: 'forge/invocation-token',
   });

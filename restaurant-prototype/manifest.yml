@@ -53,11 +53,11 @@ modules:
 
 resources:
   - key: action-ui
-    path: src/frontend/send-to-kitchen.jsx
+    path: src/frontend/send-to-kitchen.tsx
   - key: context-ui
-    path: src/frontend/table-service.jsx
+    path: src/frontend/table-service.tsx
   - key: activity-ui
-    path: src/frontend/kitchen-log.jsx
+    path: src/frontend/kitchen-log.tsx
   # Custom UI: a directory with the Vite build output (run `npm run build:panel` first).
   - key: panel-ui
     path: static/kitchen-ticket/build

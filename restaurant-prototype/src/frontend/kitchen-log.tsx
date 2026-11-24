@@ -16,6 +16,7 @@ import ForgeReconciler, {
   User,
 } from '@forge/react';
 import { invokeRemote } from '@forge/bridge';
+import { errorMessage, type KitchenError, type LogEntry } from './types';
 
 const HEAD = {
   cells: [
@@ -26,17 +27,21 @@ const HEAD = {
 };
 
 const App = () => {
-  const [entries, setEntries] = useState(null);
-  const [error, setError] = useState(null);
+  // entries: null while loading.
+  const [entries, setEntries] = useState<LogEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadLog = useCallback(async () => {
     try {
       const res = await invokeRemote({ path: '/kitchen/log', method: 'GET' });
-      if (res.status >= 300) throw new Error(res.body?.error ?? `Kitchen answered ${res.status}`);
-      setEntries(res.body.entries);
+      if (res.status >= 300) {
+        const body = res.body as KitchenError | undefined;
+        throw new Error(body?.error ?? `Kitchen answered ${res.status}`);
+      }
+      setEntries((res.body as { entries: LogEntry[] }).entries);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(errorMessage(err));
     }
   }, []);
 

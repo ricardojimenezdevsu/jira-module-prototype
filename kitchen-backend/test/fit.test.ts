@@ -1,15 +1,15 @@
 // Checks the FIT rules with a locally generated key pair standing in for Atlassian's JWKS.
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose';
-import { verifyFit } from '../src/fit.js';
+import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWTPayload } from 'jose';
+import { verifyFit } from '../src/fit.ts';
 
 const APP_ID = 'ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256');
 const keySet = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }] });
 
-const sign = (claims, { audience = APP_ID, issuer = 'forge/invocation-token' } = {}) =>
+const sign = (claims: JWTPayload, { audience = APP_ID, issuer = 'forge/invocation-token' } = {}) =>
   new SignJWT(claims)
     .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
     .setIssuedAt()
@@ -20,7 +20,7 @@ const sign = (claims, { audience = APP_ID, issuer = 'forge/invocation-token' } =
 
 test('accepts a token for our app', async () => {
   const claims = await verifyFit(await sign({ app: { id: APP_ID } }), APP_ID, keySet);
-  assert.equal(claims.app.id, APP_ID);
+  assert.equal(claims.app?.id, APP_ID);
 });
 
 test('rejects a token for another app (audience)', async () => {

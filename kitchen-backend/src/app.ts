@@ -7,57 +7,65 @@
  *
  * Data is kept in memory and lost on restart. That is fine for a throwaway prototype.
  */
-import express from 'express';
+import express, { type ErrorRequestHandler, type Express } from 'express';
+import type { AppDeps, FitClaims, ForgeRequestContext, IssueRecord, Ticket } from './types.ts';
 
-export const STAGES = ['Received', 'Cooking', 'Plated', 'Served'];
+export const STAGES = ['Received', 'Cooking', 'Plated', 'Served'] as const;
 
-/**
- * Builds the Express app. Dependencies are injected so tests can replace the token
- * check and the Jira call.
- * @param {object} deps
- * @param {string} deps.appId Our Forge app ID.
- * @param {(token: string, appId: string) => Promise<object>} deps.verifyFit
- * @param {(args: {apiBaseUrl: string, userToken: string, issueKey: string}) => Promise<object>} deps.fetchIssue
- * @param {Pick<Console, 'log' | 'warn' | 'error'>} [deps.logger]
- */
-export function createApp({ appId, verifyFit, fetchIssue, logger = console }) {
+/** Builds the Express app. Dependencies are injected so tests can replace them. */
+export function createApp({ appId, verifyFit, fetchIssue, logger = console }: AppDeps): Express {
   const app = express();
   app.use(express.json({ limit: '100kb' }));
 
   // In-memory store: tenant (installation) -> issue key -> { ticket, log }.
   // In a real product, "tenant" would come from mapping the installation to a
   // tenant of that product, which is out of scope for this prototype.
-  const tenants = new Map();
+  const tenants = new Map<string, Map<string, IssueRecord>>();
   let nextOrderNo = 1;
 
-  const recordFor = (forge) => {
-    if (!tenants.has(forge.installationId)) tenants.set(forge.installationId, new Map());
-    const issues = tenants.get(forge.installationId);
-    if (!issues.has(forge.issueKey)) issues.set(forge.issueKey, { ticket: null, log: [] });
-    return issues.get(forge.issueKey);
+  const recordFor = (forge: ForgeRequestContext): IssueRecord => {
+    // The auth middleware guarantees issueKey; installationId always comes with a valid FIT.
+    const installationId = forge.installationId ?? '';
+    const issueKey = forge.issueKey ?? '';
+    let issues = tenants.get(installationId);
+    if (!issues) {
+      issues = new Map();
+      tenants.set(installationId, issues);
+    }
+    let record = issues.get(issueKey);
+    if (!record) {
+      record = { ticket: null, log: [] };
+      issues.set(issueKey, record);
+    }
+    return record;
   };
 
-  const addLog = (record, accountId, text) => {
+  const addLog = (record: IssueRecord, accountId: string | undefined, text: string) => {
     record.log.push({ at: new Date().toISOString(), accountId, text });
   };
 
   // Unauthenticated health check, handy for checking the tunnel from a browser.
-  app.get('/health', (_req, res) => res.json({ ok: true }));
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true });
+  });
 
   // ---- Forge authentication for everything under /kitchen ----
   app.use('/kitchen', async (req, res, next) => {
     const match = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '');
     if (!match) {
-      return res.status(401).json({ error: 'Missing Forge Invocation Token' });
+      res.status(401).json({ error: 'Missing Forge Invocation Token' });
+      return;
     }
 
-    let fit;
+    let fit: FitClaims;
     try {
       fit = await verifyFit(match[1], appId);
     } catch (error) {
-      logger.warn(`[forge] rejected ${req.method} ${req.originalUrl}: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`[forge] rejected ${req.method} ${req.originalUrl}: ${message}`);
       // 401 tells Forge the token could not be verified.
-      return res.status(401).json({ error: 'Invalid Forge Invocation Token' });
+      res.status(401).json({ error: 'Invalid Forge Invocation Token' });
+      return;
     }
 
     const issue = fit.context?.extension?.issue;
@@ -84,7 +92,8 @@ export function createApp({ appId, verifyFit, fetchIssue, logger = console }) {
     );
 
     if (!f.issueKey) {
-      return res.status(400).json({ error: 'This request did not come from an issue view module' });
+      res.status(400).json({ error: 'This request did not come from an issue view module' });
+      return;
     }
     next();
   });
@@ -92,28 +101,32 @@ export function createApp({ appId, verifyFit, fetchIssue, logger = console }) {
   // ---- Send to kitchen (Issue Action) ----
   app.post('/kitchen/orders', async (req, res) => {
     const f = req.forge;
+    const issueKey = f.issueKey as string; // checked by the auth middleware
     if (!f.userToken) {
-      return res.status(403).json({ error: 'No user token: check endpoint.auth.appUserToken in the manifest' });
+      res.status(403).json({ error: 'No user token: check endpoint.auth.appUserToken in the manifest' });
+      return;
     }
 
     // Read the issue from Jira on the server, as the user (pattern A).
     const issue = await fetchIssue({
-      apiBaseUrl: f.apiBaseUrl,
+      apiBaseUrl: f.apiBaseUrl ?? '',
       userToken: f.userToken,
-      issueKey: f.issueKey,
+      issueKey,
     });
     const { fields } = issue;
     logger.log(
-      `[jira] read ${f.issueKey}: summary="${fields.summary}" status=${fields.status?.name} ` +
+      `[jira] read ${issueKey}: summary="${fields.summary}" status=${fields.status?.name} ` +
         `priority=${fields.priority?.name} labels=[${(fields.labels ?? []).join(', ')}]`
     );
 
-    const rush = ['Highest', 'High'].includes(fields.priority?.name);
-    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 500) : '';
-    const ticket = {
+    const rush = ['Highest', 'High'].includes(fields.priority?.name ?? '');
+    const body: unknown = req.body;
+    const rawNotes = typeof body === 'object' && body !== null ? (body as { notes?: unknown }).notes : undefined;
+    const notes = typeof rawNotes === 'string' ? rawNotes.trim().slice(0, 500) : '';
+    const ticket: Ticket = {
       orderNo: nextOrderNo++,
-      issueKey: f.issueKey,
-      table: f.issueKey.split('-').pop(),
+      issueKey,
+      table: issueKey.split('-').pop() ?? issueKey,
       dish: fields.summary,
       course: fields.issuetype?.name ?? 'Main',
       dietary: fields.labels ?? [],
@@ -141,9 +154,13 @@ export function createApp({ appId, verifyFit, fetchIssue, logger = console }) {
   app.post('/kitchen/ticket/advance', (req, res) => {
     const record = recordFor(req.forge);
     const { ticket } = record;
-    if (!ticket) return res.status(404).json({ error: 'No order for this issue yet' });
+    if (!ticket) {
+      res.status(404).json({ error: 'No order for this issue yet' });
+      return;
+    }
     if (ticket.stageIndex >= STAGES.length - 1) {
-      return res.status(409).json({ error: 'This order was already served' });
+      res.status(409).json({ error: 'This order was already served' });
+      return;
     }
     ticket.stageIndex += 1;
     addLog(record, req.forge.accountId, `Order #${ticket.orderNo} is now ${STAGES[ticket.stageIndex]}`);
@@ -157,11 +174,13 @@ export function createApp({ appId, verifyFit, fetchIssue, logger = console }) {
   });
 
   // Errors always go back as JSON (invokeRemote needs a JSON body on non-2xx), never as 401.
-  app.use((error, _req, res, _next) => {
-    const status = error.status && error.status !== 401 ? error.status : 500;
-    logger.error(`[kitchen] ${status}: ${error.message}`);
-    res.status(status).json({ error: status === 500 ? 'The kitchen had a problem' : error.message });
-  });
+  const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+    const err = error as Error & { status?: number };
+    const status = err.status && err.status !== 401 ? err.status : 500;
+    logger.error(`[kitchen] ${status}: ${err.message}`);
+    res.status(status).json({ error: status === 500 ? 'The kitchen had a problem' : err.message });
+  };
+  app.use(errorHandler);
 
   return app;
 }

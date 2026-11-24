@@ -1,12 +1,12 @@
 # Jira modules prototype
 
 Throwaway Forge app that explores Jira issue-view modules and Forge Remote. It uses a
-restaurant theme: every Jira issue is an order.
+restaurant theme: every Jira issue is an order. Everything is written in TypeScript.
 
 | Folder | What it is |
 | --- | --- |
 | `restaurant-prototype/` | The Forge app (registered as `restaurant-prototype` in the `dev` Developer Space) |
-| `kitchen-backend/` | Stub backend reached through Forge Remote (Node + Express) |
+| `kitchen-backend/` | Stub backend reached through Forge Remote (Bun + Express) |
 
 ## The four modules
 
@@ -33,16 +33,18 @@ summary = the dish.
 
 ## Run it
 
-Prerequisites: Node 22+, Forge CLI logged in (`forge login`), `cloudflared`, and a Jira
-Cloud developer site where you are an admin.
+Prerequisites: [Bun](https://bun.sh) 1.2+ for the backend, Node 22+ and the Forge CLI logged
+in (`forge login`) for the Forge app, `cloudflared`, and a Jira Cloud developer site where you
+are an admin.
 
 ```powershell
-# 1. Backend
+# 1. Backend (Bun runs the TypeScript directly and loads .env by itself)
 cd kitchen-backend
 copy .env.example .env
-npm install
-npm test
-npm start                      # http://localhost:3000/health
+bun install
+bun run typecheck
+bun test
+bun start                      # http://localhost:3000/health
 
 # 2. Public HTTPS URL for the backend (new terminal). Copy the https://....trycloudflare.com URL.
 cloudflared tunnel --url http://localhost:3000
@@ -51,7 +53,8 @@ cloudflared tunnel --url http://localhost:3000
 cd restaurant-prototype
 npm install
 npm --prefix static/kitchen-ticket install
-npm run build:panel            # Custom UI build into static/kitchen-ticket/build
+npm run typecheck              # UI Kit modules + Custom UI panel
+npm run build:panel            # Custom UI typecheck + build into static/kitchen-ticket/build
 $env:KITCHEN_URL = "https://<random>.trycloudflare.com"
 forge lint
 forge deploy -e development
@@ -72,7 +75,7 @@ with `npm run build:panel`.
   user and issue, and a `[jira]` line with the fields read on the server.
 - Open an issue, use ••• > Send to kitchen, then open the Kitchen ticket panel and the Kitchen
   log tab in Activity.
-- Tamper test: calls to `/kitchen/*` without a valid FIT get 401 (`npm test` covers this).
+- Tamper test: calls to `/kitchen/*` without a valid FIT get 401 (`bun test` covers this).
 
 ## Known limits (prototype only)
 

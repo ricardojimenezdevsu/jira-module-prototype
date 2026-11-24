@@ -5,11 +5,16 @@
   "description": "Throwaway Forge prototype: four Jira issue-view modules with a restaurant theme.",
   "scripts": {
     "build:panel": "npm --prefix static/kitchen-ticket run build",
+    "typecheck": "tsc --noEmit && npm --prefix static/kitchen-ticket run typecheck",
     "lint": "forge lint"
   },
   "dependencies": {
     "@forge/bridge": "^7.3.0",
     "@forge/react": "^12.5.0",
     "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "typescript": "^5.8.0"
   }
 }

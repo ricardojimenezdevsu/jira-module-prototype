@@ -7,29 +7,58 @@
  *
  * Talks to the kitchen backend with invokeRemote, exactly like the UI Kit modules.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { invokeRemote } from '@forge/bridge';
 
+/** A kitchen ticket, as the backend sends it. */
+interface Ticket {
+  orderNo: number;
+  issueKey: string;
+  table: string;
+  dish: string;
+  course: string;
+  dietary: string[];
+  rush: boolean;
+  prepMinutes: number;
+  notes: string;
+  jiraStatus: string;
+  stages: string[];
+  stageIndex: number;
+  orderedBy?: string;
+  orderedAt: string;
+}
+
+/** GET /kitchen/ticket and POST /kitchen/ticket/advance both answer with this. */
+interface TicketResponse {
+  ticket: Ticket | null;
+}
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 /** Calls the kitchen and turns any non-2xx answer into an Error. */
-async function callKitchen(path, method = 'GET') {
+async function callKitchen<T>(path: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
   const res = await invokeRemote({ path, method });
-  if (res.status >= 300) throw new Error(res.body?.error ?? `Kitchen answered ${res.status}`);
-  return res.body;
+  if (res.status >= 300) {
+    const body = res.body as { error?: string } | undefined;
+    throw new Error(body?.error ?? `Kitchen answered ${res.status}`);
+  }
+  return res.body as T;
 }
 
 export default function App() {
   // ticket: undefined while loading, null when the issue has no order yet.
-  const [ticket, setTicket] = useState(undefined);
-  const [error, setError] = useState(null);
+  const [ticket, setTicket] = useState<Ticket | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const body = await callKitchen('/kitchen/ticket');
+      const body = await callKitchen<TicketResponse>('/kitchen/ticket');
       setTicket(body.ticket);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(errorMessage(err));
     }
   }, []);
 
@@ -40,10 +69,10 @@ export default function App() {
   const advance = async () => {
     setBusy(true);
     try {
-      const body = await callKitchen('/kitchen/ticket/advance', 'POST');
+      const body = await callKitchen<TicketResponse>('/kitchen/ticket/advance', 'POST');
       setTicket(body.ticket);
     } catch (err) {
-      setError(err.message);
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }

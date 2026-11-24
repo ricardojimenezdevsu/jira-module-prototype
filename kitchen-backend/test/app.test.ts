@@ -1,12 +1,15 @@
 // Exercises the kitchen routes end to end over HTTP, with a fake token check and a fake Jira.
-import { test, before, after } from 'node:test';
+import { test, beforeAll, afterAll } from 'bun:test';
 import assert from 'node:assert/strict';
-import { createApp } from '../src/app.js';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createApp } from '../src/app.ts';
+import type { FetchIssue, LogEntry, Ticket, VerifyFit } from '../src/types.ts';
 
 const APP_ID = 'ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000';
 
 // The fake verifier accepts "good-<issueKey>" and returns claims shaped like a real FIT.
-const verifyFit = async (token) => {
+const verifyFit: VerifyFit = async (token) => {
   if (!token.startsWith('good-')) throw new Error('bad signature');
   return {
     app: {
@@ -25,8 +28,8 @@ const verifyFit = async (token) => {
   };
 };
 
-const jiraCalls = [];
-const fetchIssue = async (args) => {
+const jiraCalls: Parameters<FetchIssue>[0][] = [];
+const fetchIssue: FetchIssue = async (args) => {
   jiraCalls.push(args);
   return {
     fields: {
@@ -40,17 +43,26 @@ const fetchIssue = async (args) => {
 };
 
 const silent = { log() {}, warn() {}, error() {} };
-let server;
-let base;
+let server: Server;
+let base: string;
 
-before(async () => {
+beforeAll(async () => {
   server = createApp({ appId: APP_ID, verifyFit, fetchIssue, logger: silent }).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
-  base = `http://localhost:${server.address().port}`;
+  base = `http://localhost:${(server.address() as AddressInfo).port}`;
 });
-after(() => server.close());
+afterAll(() => {
+  server.close();
+});
 
-const call = (path, { token, userToken, method = 'GET', body } = {}) =>
+interface CallOptions {
+  token?: string;
+  userToken?: string;
+  method?: string;
+  body?: unknown;
+}
+
+const call = (path: string, { token, userToken, method = 'GET', body }: CallOptions = {}) =>
   fetch(base + path, {
     method,
     headers: {
@@ -77,7 +89,7 @@ test('order flow: send, read ticket, advance, read log', async () => {
 
   const sent = await call('/kitchen/orders', { ...opts, method: 'POST', body: { notes: 'No onions' } });
   assert.equal(sent.status, 201);
-  const { ticket } = await sent.json();
+  const { ticket } = (await sent.json()) as { ticket: Ticket };
   assert.equal(ticket.dish, 'Mushroom risotto');
   assert.equal(ticket.issueKey, 'SP-10'); // from the token, not the body
   assert.equal(ticket.rush, true);
@@ -89,10 +101,12 @@ test('order flow: send, read ticket, advance, read log', async () => {
     issueKey: 'SP-10',
   });
 
-  const advanced = await (await call('/kitchen/ticket/advance', { ...opts, method: 'POST' })).json();
+  const advanced = (await (await call('/kitchen/ticket/advance', { ...opts, method: 'POST' })).json()) as {
+    ticket: Ticket;
+  };
   assert.equal(advanced.ticket.stageIndex, 1);
 
-  const { entries } = await (await call('/kitchen/log', opts)).json();
+  const { entries } = (await (await call('/kitchen/log', opts)).json()) as { entries: LogEntry[] };
   assert.equal(entries.length, 2);
   assert.match(entries[0].text, /Cooking/); // newest first
   assert.equal(entries[1].accountId, 'account-1');

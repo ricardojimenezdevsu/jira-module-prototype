@@ -20,9 +20,23 @@ import ForgeReconciler, {
   useProductContext,
 } from '@forge/react';
 import { events, requestJira } from '@forge/bridge';
+import { errorMessage } from './types';
+
+/** The issue fields this panel reads from Jira. */
+interface JiraIssue {
+  fields: {
+    summary: string;
+    status?: { statusCategory?: { key?: string } };
+    assignee?: { displayName?: string } | null;
+    priority?: { name?: string };
+    labels?: string[];
+  };
+}
+
+type LozengeAppearance = 'default' | 'inprogress' | 'success';
 
 // Status category key from Jira -> restaurant wording and lozenge colour.
-const COURSE_BY_CATEGORY = {
+const COURSE_BY_CATEGORY: Record<string, { label: string; appearance: LozengeAppearance }> = {
   new: { label: 'Seated', appearance: 'default' },
   indeterminate: { label: 'Being served', appearance: 'inprogress' },
   done: { label: 'Paid', appearance: 'success' },
@@ -30,10 +44,10 @@ const COURSE_BY_CATEGORY = {
 
 const App = () => {
   const context = useProductContext();
-  const issueKey = context?.extension?.issue?.key;
+  const issueKey: string | undefined = context?.extension?.issue?.key;
 
-  const [issue, setIssue] = useState(null);
-  const [error, setError] = useState(null);
+  const [issue, setIssue] = useState<JiraIssue | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadIssue = useCallback(async () => {
     if (!issueKey) return;
@@ -43,10 +57,10 @@ const App = () => {
         `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${fields}`
       );
       if (!res.ok) throw new Error(`Jira answered ${res.status}`);
-      setIssue(await res.json());
+      setIssue((await res.json()) as JiraIssue);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(errorMessage(err));
     }
   }, [issueKey]);
 
@@ -66,12 +80,12 @@ const App = () => {
       </SectionMessage>
     );
   }
-  if (!issue) return <Spinner label="Checking the table" />;
+  if (!issue || !issueKey) return <Spinner label="Checking the table" />;
 
   const { fields } = issue;
   const tableNumber = issueKey.split('-').pop();
-  const course = COURSE_BY_CATEGORY[fields.status?.statusCategory?.key] ?? COURSE_BY_CATEGORY.new;
-  const isVip = ['Highest', 'High'].includes(fields.priority?.name);
+  const course = COURSE_BY_CATEGORY[fields.status?.statusCategory?.key ?? 'new'] ?? COURSE_BY_CATEGORY.new;
+  const isVip = ['Highest', 'High'].includes(fields.priority?.name ?? '');
   const dietary = fields.labels ?? [];
 
   return (

@@ -21,6 +21,14 @@ import ForgeReconciler, {
   useProductContext,
 } from '@forge/react';
 import { invokeRemote, view } from '@forge/bridge';
+import { errorMessage, type KitchenError, type Ticket } from './types';
+
+/** What the modal is doing right now. */
+type SendState =
+  | { status: 'idle' }
+  | { status: 'sending' }
+  | { status: 'sent'; ticket: Ticket }
+  | { status: 'error'; message: string };
 
 const App = () => {
   // Product context tells us which issue the modal was opened on (display only).
@@ -28,8 +36,7 @@ const App = () => {
   const issueKey = context?.extension?.issue?.key;
 
   const [notes, setNotes] = useState('');
-  // status: idle | sending | sent | error
-  const [state, setState] = useState({ status: 'idle' });
+  const [state, setState] = useState<SendState>({ status: 'idle' });
 
   const sendOrder = async () => {
     setState({ status: 'sending' });
@@ -42,13 +49,14 @@ const App = () => {
       });
       // Non-2xx responses with a JSON body resolve (they do not throw), so check the status.
       if (res.status >= 300) {
-        setState({ status: 'error', message: res.body?.error ?? `Kitchen answered ${res.status}` });
+        const body = res.body as KitchenError | undefined;
+        setState({ status: 'error', message: body?.error ?? `Kitchen answered ${res.status}` });
         return;
       }
-      setState({ status: 'sent', ticket: res.body.ticket });
+      setState({ status: 'sent', ticket: (res.body as { ticket: Ticket }).ticket });
     } catch (error) {
       // Thrown for network errors, timeouts, or a 401 (token verification failed).
-      setState({ status: 'error', message: error.message });
+      setState({ status: 'error', message: errorMessage(error) });
     }
   };
 

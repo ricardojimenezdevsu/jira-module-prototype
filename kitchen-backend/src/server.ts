@@ -1,9 +1,10 @@
 /**
- * Starts the kitchen backend: `npm start` (or `npm run dev` to restart on changes).
+ * Starts the kitchen backend: `bun start` (or `bun run dev` to restart on changes).
+ * Bun loads `.env` automatically.
  */
-import { createApp } from './app.js';
-import { verifyFit } from './fit.js';
-import { fetchIssue } from './jira.js';
+import { createApp } from './app.ts';
+import { verifyFit } from './fit.ts';
+import { fetchIssue } from './jira.ts';
 
 const appId = process.env.FORGE_APP_ID;
 if (!appId) {
