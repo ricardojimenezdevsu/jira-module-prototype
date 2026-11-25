@@ -73,7 +73,16 @@ because a new remote URL is a major version.
 
 To iterate on the UI Kit modules without redeploying, run `forge tunnel` (with `KITCHEN_URL`
 set) while the backend and cloudflared are running. With manual packaging the tunnel serves
-`build/`, not the sources, so run `bun run build` again after each change.
+`build/`, not the sources, so keep `bun run watch` running next to it to rebuild on save:
+
+```bash
+cd restaurant-prototype
+bun run watch    # terminal 1: rebuilds build/ on every save
+forge tunnel     # terminal 2: Jira loads build/ from this machine, for your own requests only
+```
+
+Then refresh the issue in Jira to see the change. Watch mode leaves old hashed `.js` files in
+`build/`; `bun run build` and `bun run deploy` empty the folder first, so they are not uploaded.
 
 The frontend `tsconfig.json` lives in `src/frontend/`, not in the app root. With a root
 tsconfig, `forge lint` (CLI 15.1) tries to type-lint the bundled `build/*.js` and fails.

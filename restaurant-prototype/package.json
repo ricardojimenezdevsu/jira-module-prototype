@@ -5,6 +5,7 @@
   "description": "Throwaway Forge prototype: four Jira issue-view modules with a restaurant theme.",
   "scripts": {
     "build": "rm -rf build && bun build ./src/frontend/send-to-kitchen.html ./src/frontend/table-service.html ./src/frontend/kitchen-ticket.html ./src/frontend/kitchen-log.html --outdir build --production",
+    "watch": "bun build ./src/frontend/send-to-kitchen.html ./src/frontend/table-service.html ./src/frontend/kitchen-ticket.html ./src/frontend/kitchen-log.html --outdir build --watch --no-clear-screen",
     "typecheck": "tsc --project src/frontend",
     "lint": "forge lint",
     "deploy": "bun run build && forge deploy"
