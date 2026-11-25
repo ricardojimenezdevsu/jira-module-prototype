@@ -41,10 +41,20 @@ export interface ForgeRequestContext {
   userToken?: string;
 }
 
-/** The issue fields the kitchen reads from Jira. */
+/** A node of Atlassian Document Format, the rich-text format of Jira descriptions. */
+export interface AdfNode {
+  type: string;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  content?: AdfNode[];
+}
+
+/** The issue fields the connector reads from Jira. */
 export interface JiraIssue {
   fields: {
     summary: string;
+    description?: AdfNode | null;
     status?: { name?: string };
     priority?: { name?: string };
     labels?: string[];
@@ -88,6 +98,18 @@ export type FetchIssue = (args: {
   userToken: string;
   issueKey: string;
 }) => Promise<JiraIssue>;
+
+/** Which issue property a call is about, and who it is made as. */
+export interface IssuePropertyArgs {
+  apiBaseUrl: string;
+  userToken: string;
+  issueIdOrKey: string;
+  propertyKey: string;
+}
+
+export type GetIssueProperty = (args: IssuePropertyArgs) => Promise<unknown>;
+export type SetIssueProperty = (args: IssuePropertyArgs & { value: unknown }) => Promise<void>;
+export type DeleteIssueProperty = (args: IssuePropertyArgs) => Promise<void>;
 
 export type Logger = Pick<Console, 'log' | 'warn' | 'error'>;
 
