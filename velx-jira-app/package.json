@@ -1,8 +1,8 @@
 {
-  "name": "restaurant-prototype",
+  "name": "velx-jira-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Throwaway Forge prototype: four Jira issue-view modules with a restaurant theme.",
+  "description": "Throwaway Forge prototype: Jira issue-view modules that link issues to Velx initiatives.",
   "scripts": {
     "build": "rm -rf build && bun build ./src/frontend/send-to-kitchen.html ./src/frontend/table-service.html ./src/frontend/kitchen-ticket.html ./src/frontend/kitchen-log.html --outdir build --production",
     "watch": "bun build ./src/frontend/send-to-kitchen.html ./src/frontend/table-service.html ./src/frontend/kitchen-ticket.html ./src/frontend/kitchen-log.html --outdir build --watch --no-clear-screen",

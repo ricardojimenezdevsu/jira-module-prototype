@@ -6,7 +6,7 @@
 #   - Issue Panel    "Kitchen ticket"   (UI Kit)    -> shows / advances the ticket kept by the backend
 #   - Issue Activity "Kitchen log"      (UI Kit)    -> lists what the backend logged for this issue
 #
-# The "kitchen" is our stub backend (../kitchen-backend), reached through Forge Remote:
+# The "kitchen" is our stub backend (../velx-backend), reached through Forge Remote:
 #   UI module --resolver.endpoint--> endpoint "kitchen-endpoint" --remote--> remotes "kitchen"
 #
 # The UI uses manual packaging: `bun run build` bundles src/frontend/*.html into build/,

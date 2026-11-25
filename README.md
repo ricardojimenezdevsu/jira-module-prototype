@@ -5,8 +5,8 @@ restaurant theme: every Jira issue is an order. Everything is written in TypeScr
 
 | Folder | What it is |
 | --- | --- |
-| `restaurant-prototype/` | The Forge app (registered as `restaurant-prototype` in the `dev` Developer Space) |
-| `kitchen-backend/` | Stub backend reached through Forge Remote (Bun + Express) |
+| `velx-jira-app/` | The Forge app (registered as `restaurant-prototype` in the `dev` Developer Space) |
+| `velx-backend/` | Stub backend reached through Forge Remote (Bun + Express) |
 
 ## The four modules
 
@@ -19,8 +19,8 @@ restaurant theme: every Jira issue is an order. Everything is written in TypeScr
 
 The UI uses Forge [manual packaging](https://developer.atlassian.com/platform/forge/manifest-reference/packaging/)
 (preview): Forge does not compile or bundle it. Each module has an HTML entry in
-`restaurant-prototype/src/frontend/` (for example `kitchen-log.html`) that loads its `.tsx`
-file. `bun run build` bundles these entries into `restaurant-prototype/build/`, and that
+`velx-jira-app/src/frontend/` (for example `kitchen-log.html`) that loads its `.tsx`
+file. `bun run build` bundles these entries into `velx-jira-app/build/`, and that
 folder is what `forge deploy` uploads, as one multi-entry resource (`frontend/<entry>` in
 the manifest).
 
@@ -46,7 +46,7 @@ developer site where you are an admin.
 
 ```powershell
 # 1. Backend (Bun runs the TypeScript directly and loads .env by itself)
-cd kitchen-backend
+cd velx-backend
 copy .env.example .env
 bun install
 bun run typecheck
@@ -57,7 +57,7 @@ bun start                      # http://localhost:3000/health
 cloudflared tunnel --url http://localhost:3000
 
 # 3. Forge app (new terminal)
-cd restaurant-prototype
+cd velx-jira-app
 bun install
 bun run typecheck              # tsc on src/frontend
 bun run build                  # Bun bundles src/frontend/*.html into build/
@@ -76,7 +76,7 @@ set) while the backend and cloudflared are running. With manual packaging the tu
 `build/`, not the sources, so keep `bun run watch` running next to it to rebuild on save:
 
 ```bash
-cd restaurant-prototype
+cd velx-jira-app
 bun run watch    # terminal 1: rebuilds build/ on every save
 forge tunnel     # terminal 2: Jira loads build/ from this machine, for your own requests only
 ```
