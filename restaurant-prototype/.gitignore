@@ -3,4 +3,4 @@ node_modules/
 
 /.forge/
 
-/static/kitchen-ticket/build/
+/build/

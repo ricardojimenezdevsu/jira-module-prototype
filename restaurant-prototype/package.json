@@ -4,9 +4,10 @@
   "private": true,
   "description": "Throwaway Forge prototype: four Jira issue-view modules with a restaurant theme.",
   "scripts": {
-    "build:panel": "npm --prefix static/kitchen-ticket run build",
-    "typecheck": "tsc --noEmit && npm --prefix static/kitchen-ticket run typecheck",
-    "lint": "forge lint"
+    "build": "rm -rf build && bun build ./src/frontend/send-to-kitchen.html ./src/frontend/table-service.html ./src/frontend/kitchen-ticket.html ./src/frontend/kitchen-log.html --outdir build --production",
+    "typecheck": "tsc --project src/frontend",
+    "lint": "forge lint",
+    "deploy": "bun run build && forge deploy"
   },
   "dependencies": {
     "@forge/bridge": "^7.3.0",

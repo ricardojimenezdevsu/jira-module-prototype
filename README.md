@@ -14,8 +14,15 @@ restaurant theme: every Jira issue is an order. Everything is written in TypeScr
 | --- | --- | --- | --- |
 | `jira:issueAction` | Send to kitchen (••• menu) | UI Kit | Kitchen backend: `POST /kitchen/orders` |
 | `jira:issueContext` | Table service (right sidebar) | UI Kit | Jira only, in the browser with `requestJira` |
-| `jira:issuePanel` | Kitchen ticket (panel button) | Custom UI (React + Vite) | Kitchen backend: `GET /kitchen/ticket`, `POST /kitchen/ticket/advance` |
+| `jira:issuePanel` | Kitchen ticket (panel button) | UI Kit | Kitchen backend: `GET /kitchen/ticket`, `POST /kitchen/ticket/advance` |
 | `jira:issueActivity` | Kitchen log (Activity tab) | UI Kit | Kitchen backend: `GET /kitchen/log` |
+
+The UI uses Forge [manual packaging](https://developer.atlassian.com/platform/forge/manifest-reference/packaging/)
+(preview): Forge does not compile or bundle it. Each module has an HTML entry in
+`restaurant-prototype/src/frontend/` (for example `kitchen-log.html`) that loads its `.tsx`
+file. `bun run build` bundles these entries into `restaurant-prototype/build/`, and that
+folder is what `forge deploy` uploads, as one multi-entry resource (`frontend/<entry>` in
+the manifest).
 
 Restaurant mapping: issue number = table, assignee = waiter, status category = course
 (seated, being served, paid), High/Highest priority = VIP or rush, labels = dietary notes,
@@ -33,9 +40,9 @@ summary = the dish.
 
 ## Run it
 
-Prerequisites: [Bun](https://bun.sh) 1.2+ for the backend, Node 22+ and the Forge CLI logged
-in (`forge login`) for the Forge app, `cloudflared`, and a Jira Cloud developer site where you
-are an admin.
+Prerequisites: [Bun](https://bun.sh) 1.2+ for the backend and to build the Forge app, Node 22+
+and the Forge CLI logged in (`forge login`) for the Forge app, `cloudflared`, and a Jira Cloud
+developer site where you are an admin.
 
 ```powershell
 # 1. Backend (Bun runs the TypeScript directly and loads .env by itself)
@@ -51,13 +58,12 @@ cloudflared tunnel --url http://localhost:3000
 
 # 3. Forge app (new terminal)
 cd restaurant-prototype
-npm install
-npm --prefix static/kitchen-ticket install
-npm run typecheck              # UI Kit modules + Custom UI panel
-npm run build:panel            # Custom UI typecheck + build into static/kitchen-ticket/build
+bun install
+bun run typecheck              # tsc on src/frontend
+bun run build                  # Bun bundles src/frontend/*.html into build/
 $env:KITCHEN_URL = "https://<random>.trycloudflare.com"
 forge lint
-forge deploy -e development
+forge deploy -e development    # uploads build/ as-is: always run `bun run build` first
 forge install -e development --site <your-site>.atlassian.net --product jira
 ```
 
@@ -66,8 +72,11 @@ The quick-tunnel URL changes every time cloudflared restarts. When it does, set 
 because a new remote URL is a major version.
 
 To iterate on the UI Kit modules without redeploying, run `forge tunnel` (with `KITCHEN_URL`
-set) while the backend and cloudflared are running. Rebuild the Custom UI panel after changes
-with `npm run build:panel`.
+set) while the backend and cloudflared are running. With manual packaging the tunnel serves
+`build/`, not the sources, so run `bun run build` again after each change.
+
+The frontend `tsconfig.json` lives in `src/frontend/`, not in the app root. With a root
+tsconfig, `forge lint` (CLI 15.1) tries to type-lint the bundled `build/*.js` and fails.
 
 ## What to look at when testing
 

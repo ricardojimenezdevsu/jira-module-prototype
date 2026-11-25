@@ -1,0 +1,20 @@
+{
+  // Frontend tsconfig, used by `bun run typecheck` (tsc) and by Bun when bundling.
+  // It lives here, not at the app root: with a root tsconfig.json, `forge lint` parses the
+  // bundled build/*.js through it and fails because they are not part of the project.
+  // "jsx": "react" makes Bun emit classic React.createElement calls, which manual packaging
+  // for UI Kit requires.
+  "compilerOptions": {
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
+  },
+  "include": ["."]
+}

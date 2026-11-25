@@ -3,16 +3,19 @@
 # Each Jira issue is treated as a restaurant order:
 #   - Issue Action   "Send to kitchen"  (UI Kit)    -> POSTs the order to the kitchen backend
 #   - Issue Context  "Table service"    (UI Kit)    -> reads the issue in the browser with requestJira
-#   - Issue Panel    "Kitchen ticket"   (Custom UI) -> shows / advances the ticket kept by the backend
+#   - Issue Panel    "Kitchen ticket"   (UI Kit)    -> shows / advances the ticket kept by the backend
 #   - Issue Activity "Kitchen log"      (UI Kit)    -> lists what the backend logged for this issue
 #
 # The "kitchen" is our stub backend (../kitchen-backend), reached through Forge Remote:
 #   UI module --resolver.endpoint--> endpoint "kitchen-endpoint" --remote--> remotes "kitchen"
+#
+# The UI uses manual packaging: `bun run build` bundles src/frontend/*.html into build/,
+# and `forge deploy` uploads build/ as-is. Always rebuild before deploying.
 
 modules:
   jira:issueAction:
     - key: send-to-kitchen
-      resource: action-ui
+      resource: frontend/send-to-kitchen
       render: native
       resolver:
         endpoint: kitchen-endpoint
@@ -20,14 +23,15 @@ modules:
 
   jira:issueContext:
     - key: table-service
-      resource: context-ui
+      resource: frontend/table-service
       render: native
       title: Table service
       label: Table service
 
   jira:issuePanel:
     - key: kitchen-ticket
-      resource: panel-ui
+      resource: frontend/kitchen-ticket
+      render: native
       resolver:
         endpoint: kitchen-endpoint
       title: Kitchen ticket
@@ -35,7 +39,7 @@ modules:
 
   jira:issueActivity:
     - key: kitchen-log
-      resource: activity-ui
+      resource: frontend/kitchen-log
       render: native
       resolver:
         endpoint: kitchen-endpoint
@@ -52,15 +56,17 @@ modules:
           enabled: true
 
 resources:
-  - key: action-ui
-    path: src/frontend/send-to-kitchen.tsx
-  - key: context-ui
-    path: src/frontend/table-service.tsx
-  - key: activity-ui
-    path: src/frontend/kitchen-log.tsx
-  # Custom UI: a directory with the Vite build output (run `npm run build:panel` first).
-  - key: panel-ui
-    path: static/kitchen-ticket/build
+  # One UI Kit resource with one entry per module (modules use `resource: frontend/<entry>`).
+  # Manual packaging (preview): Forge uploads build/ without compiling or bundling it.
+  # Each entry is an HTML file in build/ that Bun produced from src/frontend/<entry>.html.
+  - key: frontend
+    bundler: manual@2026
+    path: build
+    entry:
+      send-to-kitchen: send-to-kitchen.html
+      table-service: table-service.html
+      kitchen-ticket: kitchen-ticket.html
+      kitchen-log: kitchen-log.html
 
 remotes:
   - key: kitchen
