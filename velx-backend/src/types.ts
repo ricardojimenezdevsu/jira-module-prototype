@@ -1,7 +1,10 @@
 /**
- * Shared types for the kitchen backend.
+ * Shared types for the Velx connector stub.
  */
 import type { JWTPayload } from 'jose';
+import type { LinkStore } from './linkStore.ts';
+import type { VelxClient } from './velx/client.ts';
+import type { JournalEntry, StepType } from './velx/types.ts';
 
 /** Claims of a verified Forge Invocation Token (only the parts we read). */
 export interface FitClaims extends JWTPayload {
@@ -26,7 +29,7 @@ export interface FitClaims extends JWTPayload {
   icLabel?: string;
 }
 
-/** What the auth middleware attaches to every /kitchen request as `req.forge`. */
+/** What the auth middleware attaches to every connector request as `req.forge`. */
 export interface ForgeRequestContext {
   installationId?: string;
   environment?: string;
@@ -62,33 +65,20 @@ export interface JiraIssue {
   };
 }
 
-export interface Ticket {
-  orderNo: number;
-  issueKey: string;
-  table: string;
-  dish: string;
-  course: string;
-  dietary: string[];
-  rush: boolean;
-  prepMinutes: number;
-  notes: string;
-  jiraStatus: string;
-  stages: readonly string[];
-  stageIndex: number;
-  orderedBy?: string;
-  orderedAt: string;
-}
-
-export interface LogEntry {
+/**
+ * One line of the "Velx journal" activity tab: a Velx journal entry, or something the
+ * connector did for this issue (source "jira").
+ */
+export interface ActivityEntry {
   at: string;
+  source: JournalEntry['source'] | 'jira';
+  tag?: JournalEntry['tag'];
+  step?: StepType;
+  /** Velx username, for Velx entries. Not an Atlassian account. */
+  velxUsername?: string;
+  /** Atlassian account ID, for connector events. */
   accountId?: string;
   text: string;
-}
-
-/** Everything the kitchen keeps for one issue. */
-export interface IssueRecord {
-  ticket: Ticket | null;
-  log: LogEntry[];
 }
 
 export type VerifyFit = (token: string, appId: string) => Promise<FitClaims>;
@@ -113,12 +103,20 @@ export type DeleteIssueProperty = (args: IssuePropertyArgs) => Promise<void>;
 
 export type Logger = Pick<Console, 'log' | 'warn' | 'error'>;
 
-/** Dependencies of createApp. They are injected so tests can replace the token check and the Jira call. */
+/** Dependencies of createApp. They are injected so tests can replace Jira, Velx and the token check. */
 export interface AppDeps {
   /** Our Forge app ID. */
   appId: string;
   verifyFit: VerifyFit;
   fetchIssue: FetchIssue;
+  linkStore: LinkStore;
+  velx: VelxClient;
+  /** Base URL of the Velx web app, for "Open in Velx" links. */
+  velxWebUrl: string;
+  /** The Velx user every Jira user is treated as until #3755 solves user mapping. */
+  velxUsername: string;
+  /** Enables the stub-only /jira/simulate routes. */
+  simulation: boolean;
   logger?: Logger;
 }
 
