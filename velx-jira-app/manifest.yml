@@ -1,56 +1,84 @@
-# Restaurant prototype: four Jira issue-view modules talking to a Forge Remote backend.
+# Velx prototype: Jira issue-view modules that link Jira issues to Velx (app-scanner) initiatives.
 #
-# Each Jira issue is treated as a restaurant order:
-#   - Issue Action   "Send to kitchen"  (UI Kit)    -> POSTs the order to the kitchen backend
-#   - Issue Context  "Table service"    (UI Kit)    -> reads the issue in the browser with requestJira
-#   - Issue Panel    "Kitchen ticket"   (UI Kit)    -> shows / advances the ticket kept by the backend
-#   - Issue Activity "Kitchen log"      (UI Kit)    -> lists what the backend logged for this issue
+#   - Issue Action   "Link to Velx initiative"  -> link the issue to an existing initiative, change or remove the link
+#   - Issue Action   "Create Velx initiative"   -> create an initiative from the issue and link it
+#   - Issue Context  "Velx initiative"          -> status and current step of the linked initiative
+#   - Issue Panel    "Velx initiative"          -> full detail: steps, repositories, goal (+ stub-only simulate buttons)
+#   - Issue Activity "Velx journal"             -> the initiative's Velx journal plus what the connector did
 #
-# The "kitchen" is our stub backend (../velx-backend), reached through Forge Remote:
-#   UI module --resolver.endpoint--> endpoint "kitchen-endpoint" --remote--> remotes "kitchen"
+# Every module talks to the Velx connector (../velx-backend, a stub of Velx) through Forge Remote:
+#   UI module --resolver.endpoint--> endpoint "velx-endpoint" --remote--> remotes "velx-connector"
+#
+# The link is stored as the issue property "velx-initiative". The context, panel and activity
+# modules show up only on issues that have it.
 #
 # The UI uses manual packaging: `bun run build` bundles src/frontend/*.html into build/,
 # and `forge deploy` uploads build/ as-is. Always rebuild before deploying.
 
 modules:
   jira:issueAction:
-    - key: send-to-kitchen
-      resource: frontend/send-to-kitchen
+    - key: link-velx-initiative
+      resource: frontend/link-velx-initiative
       render: native
       resolver:
-        endpoint: kitchen-endpoint
-      title: Send to kitchen
+        endpoint: velx-endpoint
+      title: Link to Velx initiative
+      displayConditions:
+        hasIssuePermission: EDIT_ISSUES
+
+    - key: create-velx-initiative
+      resource: frontend/create-velx-initiative
+      render: native
+      resolver:
+        endpoint: velx-endpoint
+      title: Create Velx initiative
+      displayConditions:
+        hasIssuePermission: EDIT_ISSUES
 
   jira:issueContext:
-    - key: table-service
-      resource: frontend/table-service
+    - key: velx-initiative-status
+      resource: frontend/velx-initiative-status
       render: native
-      title: Table service
-      label: Table service
+      resolver:
+        endpoint: velx-endpoint
+      title: Velx initiative
+      label: Velx
+      displayConditions:
+        entityPropertyExists:
+          entity: issue
+          propertyKey: velx-initiative
 
   jira:issuePanel:
-    - key: kitchen-ticket
-      resource: frontend/kitchen-ticket
+    - key: velx-initiative-panel
+      resource: frontend/velx-initiative-panel
       render: native
       resolver:
-        endpoint: kitchen-endpoint
-      title: Kitchen ticket
+        endpoint: velx-endpoint
+      title: Velx initiative
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      displayConditions:
+        entityPropertyExists:
+          entity: issue
+          propertyKey: velx-initiative
 
   jira:issueActivity:
-    - key: kitchen-log
-      resource: frontend/kitchen-log
+    - key: velx-journal
+      resource: frontend/velx-journal
       render: native
       resolver:
-        endpoint: kitchen-endpoint
-      title: Kitchen log
+        endpoint: velx-endpoint
+      title: Velx journal
+      displayConditions:
+        entityPropertyExists:
+          entity: issue
+          propertyKey: velx-initiative
 
-  # Forge Remote endpoint shared by the three modules that talk to the kitchen.
-  # appUserToken makes Forge send an `x-forge-oauth-user` header so the backend can
-  # read the issue from Jira with the permissions of the user who clicked.
+  # Forge Remote endpoint shared by every module.
+  # appUserToken makes Forge send an `x-forge-oauth-user` header so the connector can read the
+  # issue and read or write its velx-initiative property with the permissions of the user who clicked.
   endpoint:
-    - key: kitchen-endpoint
-      remote: kitchen
+    - key: velx-endpoint
+      remote: velx-connector
       auth:
         appUserToken:
           enabled: true
@@ -63,32 +91,34 @@ resources:
     bundler: manual@2026
     path: build
     entry:
-      send-to-kitchen: send-to-kitchen.html
-      table-service: table-service.html
-      kitchen-ticket: kitchen-ticket.html
-      kitchen-log: kitchen-log.html
+      link-velx-initiative: link-velx-initiative.html
+      create-velx-initiative: create-velx-initiative.html
+      velx-initiative-status: velx-initiative-status.html
+      velx-initiative-panel: velx-initiative-panel.html
+      velx-journal: velx-journal.html
 
 remotes:
-  - key: kitchen
+  - key: velx-connector
     # Set per deploy from the shell, e.g. the cloudflared quick-tunnel URL:
-    #   $env:KITCHEN_URL = "https://<random>.trycloudflare.com"; forge deploy
+    #   $env:VELX_CONNECTOR_URL = "https://<random>.trycloudflare.com"; bun run deploy
     # Changing this URL creates a new major version of the app.
-    baseUrl: ${KITCHEN_URL}
+    baseUrl: ${VELX_CONNECTOR_URL}
     operations:
       - compute # required for invokeRemote
-      - storage # the kitchen keeps tickets that include the issue summary
+      - storage # the connector sends issue titles and descriptions to Velx
     storage:
       inScopeEUD: true
 
 permissions:
   scopes:
-    - read:jira-work # GET /rest/api/3/issue/{key} (frontend requestJira and backend with user token)
-    - read:app-user-token # lets Forge send the user token to the kitchen backend
+    - read:jira-work # read the issue (summary, description, status) as the user
+    - write:jira-work # write and delete the velx-initiative issue property as the user
+    - read:app-user-token # lets Forge send the user token to the connector
 
 environment:
   variables:
-    - key: KITCHEN_URL
-      default: https://kitchen.example.com
+    - key: VELX_CONNECTOR_URL
+      default: https://velx-connector.example.com
 
 app:
   runtime:
