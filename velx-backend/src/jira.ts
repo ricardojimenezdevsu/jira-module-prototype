@@ -6,20 +6,12 @@
  * `x-forge-oauth-user` header. Jira applies the user's own permissions, so we only ever
  * see what that user could see in the browser.
  */
+import { HttpError } from './errors.ts';
 import type { FetchIssue, JiraIssue } from './types.ts';
 
+export { HttpError };
+
 const FIELDS = ['summary', 'status', 'priority', 'labels', 'issuetype'].join(',');
-
-/** An error that carries the HTTP status the kitchen should answer with. */
-export class HttpError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-  }
-}
 
 export const fetchIssue: FetchIssue = async ({ apiBaseUrl, userToken, issueKey }) => {
   const url = `${apiBaseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${FIELDS}`;
